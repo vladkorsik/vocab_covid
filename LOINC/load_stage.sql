@@ -2038,7 +2038,7 @@ WHERE concept_code IN ('94510-5',
 
 
 --all the selects below should return null
---
+-- all the selects below should return null- TRUE
 select distinct crs.vocabulary_id_1, crs.vocabulary_id_2 from concept_relationship_stage crs
 left join vocabulary v1 on v1.vocabulary_id=crs.vocabulary_id_1 and v1.latest_update is not null
 left join vocabulary v2 on v2.vocabulary_id=crs.vocabulary_id_2 and v2.latest_update is not null
