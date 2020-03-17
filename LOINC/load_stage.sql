@@ -22,8 +22,8 @@ DO $_$
 BEGIN
 	PERFORM VOCABULARY_PACK.SetLatestUpdate(
 	pVocabularyName			=> 'LOINC',
-	pVocabularyDate			=> (SELECT vocabulary_date FROM sources.loinc LIMIT 1),
-	pVocabularyVersion		=> (SELECT vocabulary_version FROM sources.loinc LIMIT 1),
+	pVocabularyDate			=> (SELECT vocabulary_date FROM dev_loinc.loinc_special_use_integration LIMIT 1),
+	pVocabularyVersion		=> (SELECT vocabulary_version FROM dev_loinc.loinc_special_use_integration LIMIT 1),
 	pVocabularyDevSchema	=> 'DEV_LOINC'
 );
 END $_$;
@@ -326,7 +326,7 @@ SELECT CASE
 			THEN 'D'
 		ELSE NULL
 		END AS invalid_reason
-FROM sources.loinc l
+FROM dev_loinc.loinc_special_use_integration l
 JOIN vocabulary v ON v.vocabulary_id = 'LOINC'
 LEFT JOIN concept c ON c.concept_code = l.LOINC_NUM
 	AND c.vocabulary_id = 'LOINC';
@@ -690,7 +690,7 @@ SELECT l.class AS concept_code_1, -- LOINC Class concept
 	TO_DATE('20991231', 'yyyymmdd') AS valid_end_date,
 	NULL AS invalid_reason
 FROM sources.loinc_class lc,
-	sources.loinc l
+	dev_loinc.loinc_special_use_integration l
 WHERE lc.concept_code = l.class;
 
 --10. Delete wrong relationship between 'PANEL.H' class (History & Physical order set) and 38213-5 'FLACC pain assessment panel' (AVOF-352)
@@ -713,7 +713,7 @@ INSERT INTO concept_synonym_stage (
 	SUBSTR(l.relatednames2, 1, 1000) AS synonym_name,
 	'LOINC' AS synonym_vocabulary_id,
 	4180186 AS language_concept_id -- English
-	FROM sources.loinc l WHERE l.relatednames2 IS NOT NULL
+	FROM dev_loinc.loinc_special_use_integration l WHERE l.relatednames2 IS NOT NULL
 
 UNION
 	
@@ -722,7 +722,7 @@ UNION
 	l.consumer_name AS synonym_name,
 	'LOINC' AS synonym_vocabulary_id,
 	4180186 AS language_concept_id -- English
-	FROM sources.loinc l WHERE l.consumer_name IS NOT NULL
+	FROM dev_loinc.loinc_special_use_integration l WHERE l.consumer_name IS NOT NULL
 
 UNION
 	
@@ -731,7 +731,7 @@ UNION
 	l.shortname AS synonym_name,
 	'LOINC' AS synonym_vocabulary_id,
 	4180186 AS language_concept_id -- English
-	FROM sources.loinc l WHERE l.shortname IS NOT NULL
+	FROM dev_loinc.loinc_special_use_integration l WHERE l.shortname IS NOT NULL
 
 UNION
 	
@@ -740,7 +740,7 @@ UNION
 	l.long_common_name AS synonym_name,
 	'LOINC' AS synonym_vocabulary_id,
 	4180186 AS language_concept_id -- English
-	FROM sources.loinc l WHERE NOT EXISTS (
+	FROM dev_loinc.loinc_special_use_integration l WHERE NOT EXISTS (
 		SELECT 1
 		FROM concept_stage cs_int
 		WHERE cs_int.concept_name = l.long_common_name
@@ -786,7 +786,7 @@ SELECT DISTINCT TRIM(ans_l.displaytext) AS concept_name,
 	NULL AS invalid_reason
 FROM sources.loinc_answerslist ans_l -- Answer containing table
 JOIN sources.loinc_answerslistlink ans_l_l ON ans_l_l.answerlistid = ans_l.answerlistid -- 'AnswerListID' field unites Answers with Questions
-JOIN sources.loinc l ON l.loinc_num = ans_l_l.loincnumber -- to confirm the connection of 'AnswerListID' with LOINC concepts indicating Measurements and Observations (currently all of them are connected)
+JOIN dev_loinc.loinc_special_use_integration l ON l.loinc_num = ans_l_l.loincnumber -- to confirm the connection of 'AnswerListID' with LOINC concepts indicating Measurements and Observations (currently all of them are connected)
 WHERE ans_l.answerstringid IS NOT NULL;--'AnswerStringID' value may be null
 
 --13. Build 'Has Answer' relationships from LOINC Questions to Answers with the use of such source tables as 'sources.loinc_answerslist' and 'sources.loinc_answerslistlink'
@@ -1256,7 +1256,7 @@ CREATE UNLOGGED TABLE lc_attr AS (
 	FROM lc_attr_2
 	) lc
 	-- weed out LOINC Measurements with inapplicable properties in the SNOMED architecture context
-	JOIN sources.loinc j ON j.loinc_num = lc.lc_code
+	JOIN dev_loinc.loinc_special_use_integration j ON j.loinc_num = lc.lc_code
 	AND j.property !~ 'Rto|Ratio|^\w.Fr|Imp|Prid|Zscore|Susc|^-$' -- exclude ratio/interpretation/identifier/z-score/susceptibility-related concepts
 	WHERE lc_name !~* 'susceptibility|protein\.monoclonal'
 	);-- susceptibility may have property other than 'Susc'
@@ -1531,7 +1531,7 @@ JOIN concept c ON LOWER(c.concept_name) = COALESCE(LOWER(SPLIT_PART(cs2.concept_
 		) -- 'Rate measurement', 'Uptake measurement'
 JOIN vocabulary v ON v.vocabulary_id = 'LOINC' -- get valid_start_date
 	-- weed out LOINC Measurements with inapplicable properties in the SNOMED architecture context
-JOIN sources.loinc j ON j.loinc_num = cs1.concept_code
+JOIN dev_loinc.loinc_special_use_integration j ON j.loinc_num = cs1.concept_code
 	AND j.property !~ 'Rto|Ratio|^\w.Fr|Imp|Prid|Zscore|Susc|^-$' -- ratio/interpretation/identifier/z-score/susceptibility-related concepts
 WHERE crs.relationship_id = 'Has component'
 	AND crs.vocabulary_id_1 = 'LOINC'
@@ -1816,32 +1816,37 @@ SELECT m.str,
 FROM concept_stage c
 JOIN sources.mrconso m ON m.code = concept_code
 	AND sab = 'LNC-ZH-CN';
+--29. Append result to concept_relationship_stage table
+DO $_$
+BEGIN
+	PERFORM VOCABULARY_PACK.ProcessManualRelationships();
+END $_$;
 
---29. Working with replacement mappings
+--30. Working with replacement mappings
 DO $_$
 BEGIN
 	PERFORM VOCABULARY_PACK.CheckReplacementMappings();
 END $_$;
 
---30. Add mapping from deprecated to fresh concepts
+--31. Add mapping from deprecated to fresh concepts
 DO $_$
 BEGIN
 	PERFORM VOCABULARY_PACK.AddFreshMAPSTO();
 END $_$;
 
---31. Deprecate 'Maps to' mappings to deprecated and upgraded concepts
+--32. Deprecate 'Maps to' mappings to deprecated and upgraded concepts
 DO $_$
 BEGIN
 	PERFORM VOCABULARY_PACK.DeprecateWrongMAPSTO();
 END $_$;
 
---32. Delete ambiguous 'Maps to' mappings
+--33. Delete ambiguous 'Maps to' mappings
 DO $_$
 BEGIN
 	PERFORM VOCABULARY_PACK.DeleteAmbiguousMAPSTO();
 END $_$;
 
---33. Build reverse relationships. This is necessary for the next point.
+--34. Build reverse relationships. This is necessary for the next point.
 INSERT INTO concept_relationship_stage (
 	concept_code_1,
 	concept_code_2,
@@ -1873,7 +1878,7 @@ WHERE NOT EXISTS (
 			AND r.reverse_relationship_id = i.relationship_id
 		);
 
---34. Add to the concept_relationship_stage and deprecate all relationships which do not exist there
+--35. Add to the concept_relationship_stage and deprecate all relationships which do not exist there
 INSERT INTO concept_relationship_stage (
 	concept_code_1,
 	concept_code_2,
@@ -1916,6 +1921,54 @@ WHERE a.vocabulary_id = 'LOINC'
 			AND crs_int.relationship_id = r.relationship_id
 		);
 
---35. Clean up
+--36. Clean up
 DROP TABLE sn_attr, lc_attr;
 -- At the end, the three tables concept_stage, concept_relationship_stage and concept_synonym_stage should be ready to be fed into the generic_update.sql script
+
+--DROP TABLE dev_loinc.concept_relationship_manual_covid_preliminary;
+CREATE TABLE dev_loinc.concept_relationship_manual_covid_preliminary
+(concept_code_1 varchar(255),
+       concept_code_2  varchar(255),
+       vocabulary_id_1  varchar(255),
+       vocabulary_id_2  varchar(255),
+       relationship_id  varchar(255)
+)
+;
+
+--loinc special_use integration table was created to perform integration of newly generated by LOINC codes in existent source
+--DROP TABLE dev_loinc.loinc_special_use_integration
+CREATE TABLE dev_loinc.loinc_special_use_integration AS
+    (
+        SELECT loinc      as loinc_num,
+               long_common_name,
+               component,
+               prop       as property,
+               loinc_time as time_aspct,
+               system,
+               scale as scale_typ,
+               method as method_typ,
+               shortname
+        FROM dev_loinc.loinc_prerelease lp
+        WHERE lp.special_use is not null
+--AND loinc NOT IN (SELECT loinc_num FROM sources.loinc) -- no such codes in sources
+
+        UNION ALL
+
+        SELECT loinc_num,
+               long_common_name,
+               component,
+               property,
+               time_aspct,
+               system,
+               scale_typ,
+               method_typ,
+               shortname
+        FROM sources.loinc
+    )
+;
+
+
+SELECT count(*)
+FROM dev_loinc.loinc_special_use_integration
+;
+
