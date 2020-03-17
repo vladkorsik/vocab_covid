@@ -1972,6 +1972,71 @@ SELECT         loinc      as loinc_num,
 --AND loinc NOT IN (SELECT loinc_num FROM  dev_loinc.loinc_special_use_integration)
 ;
 
+UPDATE  dev_loinc.concept_stage
+SET domain_id='Measurement'
+WHERE concept_code IN ('94510-5',
+'94502-2',
+'94531-1',
+'94312-6',
+'94500-6',
+'94504-8',
+'94509-7',
+'94311-8',
+'94306-8',
+'94316-7',
+'94507-1',
+'94308-4',
+'94511-3',
+'94309-2',
+'94503-0',
+'94508-9',
+'94313-4',
+'94501-4',
+'94307-6',
+'94314-2',
+'94499-1',
+'94506-3',
+'94315-9',
+'94532-9',
+'94533-7',
+'94534-5',
+'94310-0',
+'94505-5'
+);
+
+UPDATE  dev_loinc.concept_stage
+SET  concept_class_id='Lab Test'
+WHERE concept_code IN ('94510-5',
+'94502-2',
+'94531-1',
+'94312-6',
+'94500-6',
+'94504-8',
+'94509-7',
+'94311-8',
+'94306-8',
+'94316-7',
+'94507-1',
+'94308-4',
+'94511-3',
+'94309-2',
+'94503-0',
+'94508-9',
+'94313-4',
+'94501-4',
+'94307-6',
+'94314-2',
+'94499-1',
+'94506-3',
+'94315-9',
+'94532-9',
+'94533-7',
+'94534-5',
+'94310-0',
+'94505-5'
+);
+
+
 --all the selects below should return null
 --
 select distinct crs.vocabulary_id_1, crs.vocabulary_id_2 from concept_relationship_stage crs
@@ -2012,9 +2077,13 @@ select vocabulary_id from concept_stage
 except
 select vocabulary_id from vocabulary;
 
--- TODO domains,classes should be assignied
+
 select * from concept_stage where concept_name is null or domain_id is null or concept_class_id is null or concept_code is null or valid_start_date is null or valid_end_date is null
 or valid_end_date is null or concept_name<>trim(concept_name) or concept_code<>trim(concept_code);
+
+
+
+
 
 select concept_code_1, concept_code_2, vocabulary_id_1, vocabulary_id_2, relationship_id  from concept_relationship_stage
 group by concept_code_1, concept_code_2, vocabulary_id_1, vocabulary_id_2, relationship_id  having count(*)>1;
@@ -2049,3 +2118,6 @@ WHERE    (c1.concept_code IS NULL AND cs1.concept_code IS NULL)
 	 OR rl.relationship_id IS NULL
 	 OR crm.valid_start_date > CURRENT_DATE
 	 OR crm.valid_end_date < crm.valid_start_date;
+
+ select devv5.genericupdate()
+;
